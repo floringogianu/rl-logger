@@ -19,6 +19,13 @@ class Logger(object):
         if path is None:
             self.path = os.path.join(os.getcwd(), label)
 
+        try:
+            print("Creating directory %s." % str(self.path))
+            os.makedirs(self.path)
+        except FileExistsError:
+            print("Warning! Directory %s exists, results may be overwritten!"
+                  % str(self.path))
+
         self.groups = {}
         self.history = {}
 
