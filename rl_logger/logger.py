@@ -91,6 +91,14 @@ class Logger(object):
         with open(path, 'wb') as f:
             pickle.dump(group_hist, f)
 
+    def __str__(self):
+        return f'{self.__class__.__name__}'
+
+    def __repr__(self):
+        obj_id = hex(id(self))
+        name = self.__str__()
+        return f'{name} @ {obj_id}'
+
 
 class ConsoleLogger(object):
     def __init__(self):
