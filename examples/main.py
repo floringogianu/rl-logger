@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     eval_log = log.add_group(
         tag="evaluation",
-        metrics=(log.AvgMetric("rw_per_ep"),
+        metrics=(log.EpisodicMetric("rw_per_ep"),
                  log.AvgMetric("rw_per_step"),
                  log.MaxMetric("max_q")),
         console_options=("white", "on_magenta", ["bold"])
