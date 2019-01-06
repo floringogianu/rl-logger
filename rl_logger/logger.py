@@ -8,7 +8,7 @@ from termcolor import colored as clr
 
 from .group import Group
 from .utils import clr_err
-from .metrics import AvgMetric, MaxMetric, SumMetric, FPSMetric
+from .metrics import AvgMetric, MaxMetric, SumMetric, FPSMetric, EpisodicMetric
 
 
 class Logger(object):
@@ -34,6 +34,7 @@ class Logger(object):
         self.MaxMetric = MaxMetric
         self.SumMetric = SumMetric
         self.FPSMetric = FPSMetric
+        self.EpisodicMetric = EpisodicMetric
 
         self.console = ConsoleLogger()
 
