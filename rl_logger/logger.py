@@ -27,7 +27,6 @@ class Logger(object):
                   % str(self.path))
 
         self.groups = {}
-        self.history = {}
 
         # Need to change this
         self.AvgMetric = AvgMetric
@@ -47,8 +46,6 @@ class Logger(object):
             "Group %s already added to logger." % group.tag)
 
         self.groups[group.tag] = group
-        if group.metrics is not None:
-            self.history[group.tag] = {k: [] for k in group.metrics.keys()}
         self.console.add_group_meta(group)
 
         return self.groups[group.tag]
@@ -70,10 +67,17 @@ class Logger(object):
         self._save(group, x_metrics)
 
     def _save(self, group, x_metrics):
-        group_hist = self.history[group.tag]
+        filename = '%s.pkl' % group.tag.replace(" ", "_").lower()
+        path = os.path.join(self.path, filename)
 
         step_idx = x_metrics["step_idx"]
         time_idx = x_metrics["time_idx"]
+        
+        try:
+            with open(path, 'rb') as f:
+                group_hist = pickle.load(f)
+        except FileNotFoundError:
+            group_hist = {k: [] for k in group.metrics.keys()}
 
         for metric_name, metric in group.metrics.items():
             group_hist[metric_name].append({
@@ -82,13 +86,6 @@ class Logger(object):
                 "value": metric.get()
             })
 
-        # filename = './%s.json' % group.tag.replace("\ ", "_").lower()
-        # path = os.path.join(self.path, filename)
-        # with open(path, 'w') as f:
-            # json.dump(group_hist, f)
-
-        filename = '%s.pkl' % group.tag.replace(" ", "_").lower()
-        path = os.path.join(self.path, filename)
         with open(path, 'wb') as f:
             pickle.dump(group_hist, f)
 
