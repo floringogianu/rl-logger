@@ -1,1 +1,8 @@
-from .metrics import SumMetric, AvgMetric, MaxMetric, FPSMetric, EpisodicMetric
+from .metrics import (
+    SumMetric,
+    AvgMetric,
+    MaxMetric,
+    FPSMetric,
+    EpisodicMetric,
+    ValueMetric,
+)

@@ -8,7 +8,14 @@ from termcolor import colored as clr
 
 from .group import Group
 from .utils import clr_err
-from .metrics import AvgMetric, MaxMetric, SumMetric, FPSMetric, EpisodicMetric
+from .metrics import (
+    AvgMetric,
+    MaxMetric,
+    SumMetric,
+    FPSMetric,
+    EpisodicMetric,
+    ValueMetric,
+)
 
 
 class Logger(object):
@@ -23,8 +30,10 @@ class Logger(object):
             print("Creating directory %s." % str(self.path))
             os.makedirs(self.path)
         except FileExistsError:
-            print("Warning! Directory %s exists, results may be overwritten!"
-                  % str(self.path))
+            print(
+                "Warning! Directory %s exists, results may be overwritten!"
+                % str(self.path)
+            )
 
         self.groups = {}
 
@@ -34,16 +43,18 @@ class Logger(object):
         self.SumMetric = SumMetric
         self.FPSMetric = FPSMetric
         self.EpisodicMetric = EpisodicMetric
+        self.ValueMetric = ValueMetric
 
         self.console = ConsoleLogger()
 
         self.start_time = time.time()
-        self.step_idx = 0
+        self.prev_step_idx = 0
 
     def add_group(self, **kwargs):
         group = Group(**kwargs)
         assert group.tag not in self.groups, clr_err(
-            "Group %s already added to logger." % group.tag)
+            "Group %s already added to logger." % group.tag
+        )
 
         self.groups[group.tag] = group
         self.console.add_group_meta(group)
@@ -60,42 +71,60 @@ class Logger(object):
     def log(self, group, step_idx):
         x_metrics = {
             "step_idx": step_idx,
-            "time_idx": time.time() - self.start_time
+            "time_idx": time.time() - self.start_time,
         }
 
         self.console.log(group, x_metrics)
         self._save(group, x_metrics)
+        self.prev_step_idx = step_idx
 
     def _save(self, group, x_metrics):
-        filename = '%s.pkl' % group.tag.replace(" ", "_").lower()
+        filename = "%s.pkl" % group.tag.replace(" ", "_").lower()
         path = os.path.join(self.path, filename)
 
         step_idx = x_metrics["step_idx"]
         time_idx = x_metrics["time_idx"]
-        
+
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 group_hist = pickle.load(f)
         except FileNotFoundError:
             group_hist = {k: [] for k in group.metrics.keys()}
 
         for metric_name, metric in group.metrics.items():
-            group_hist[metric_name].append({
-                "step_idx": step_idx,
-                "time_idx": time_idx,
-                "value": metric.get()
-            })
+            # as opposed to others, ValueMetric isn't a point-value such as an
+            # average, sum or a max, but a list of value.
+            if isinstance(metric, ValueMetric):
+                prev_idx = self.prev_step_idx + 1 if self.prev_step_idx else 0
+                group_hist[metric_name].extend(
+                    [
+                        {
+                            "step_idx": prev_idx + i,
+                            "time_idx": time_idx,  # TODO: what to do about it?
+                            "value": val,
+                        }
+                        for i, val in enumerate(metric.get())
+                    ]
+                )
+            else:
+                group_hist[metric_name].append(
+                    {
+                        "step_idx": step_idx,
+                        "time_idx": time_idx,
+                        "value": metric.get(),
+                    }
+                )
 
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             pickle.dump(group_hist, f)
 
     def __str__(self):
-        return f'{self.__class__.__name__}'
+        return f"{self.__class__.__name__}"
 
     def __repr__(self):
         obj_id = hex(id(self))
         name = self.__str__()
-        return f'{name} @ {obj_id}'
+        return f"{name} @ {obj_id}"
 
 
 class ConsoleLogger(object):
@@ -118,7 +147,7 @@ class ConsoleLogger(object):
             "display_name": clr(display_name, *group.console_options),
             "color": group.console_options,
             "name_len": len(group_name),
-            "max_metrics_len": max_metric_len
+            "max_metrics_len": max_metric_len,
         }
 
     def log_info(self, group, info):
@@ -131,8 +160,9 @@ class ConsoleLogger(object):
         sys.stdout.flush()
 
     def log(self, group, x_metrics):
-        y_metrics = [(v.get_name(), v.get(), v.emph) for k, v in
-                     group.metrics.items()]
+        y_metrics = [
+            (v.get_name(), v.get(), v.emph) for k, v in group.metrics.items()
+        ]
 
         self.display(group.tag, y_metrics, x_metrics)
         sys.stdout.flush()
@@ -142,7 +172,7 @@ class ConsoleLogger(object):
         right, r_len = right
         padding = "." * (self.console_width - (l_len + r_len) - 3)
         if bold:
-            padding = clr(padding, attrs=['bold'])
+            padding = clr(padding, attrs=["bold"])
         return "%s %s %s" % (left, padding, right)
 
     def display(self, group_name, y_metrics, x_metrics):
@@ -151,20 +181,29 @@ class ConsoleLogger(object):
         # display header
         x_idx = "%8d steps | %s elapsed." % (
             x_metrics["step_idx"],
-            str(datetime.timedelta(seconds=x_metrics["time_idx"]))[:-7])
+            str(datetime.timedelta(seconds=x_metrics["time_idx"]))[:-7],
+        )
         self._display_header(meta, x_idx)
 
         # display y_metrics
-        for m in y_metrics:
-            metric_label = "    | %s" % m[0]
-            val = "%05.3f." % m[1]
-            emph = m[2]
-            if emph:
-                left = (clr(metric_label, attrs=['bold']), len(metric_label))
-                right = (clr(val, attrs=['bold']), len(val))
+        for metric_label, val, emph in y_metrics:
+            metric_label = f"    | {metric_label}"
+            if isinstance(val, list):
+                val = f"{len(val)} values."
+                if emph:
+                    left = (clr(metric_label, attrs=["bold"]), len(metric_label))
+                    right = (clr(val, attrs=["bold"]), len(val))
+                else:
+                    left = (metric_label, len(metric_label))
+                    right = (val, len(val))
             else:
-                left = (metric_label, len(metric_label))
-                right = (val, len(val))
+                val = f"{val:05.3f}."
+                if emph:
+                    left = (clr(metric_label, attrs=["bold"]), len(metric_label))
+                    right = (clr(val, attrs=["bold"]), len(val))
+                else:
+                    left = (metric_label, len(metric_label))
+                    right = (val, len(val))
             print(self.justify_right(left, right))
 
     def _display_header(self, meta, x_idx):

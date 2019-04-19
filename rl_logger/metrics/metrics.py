@@ -41,6 +41,21 @@ class BaseMetric(object):
         raise NotImplementedError
 
 
+class ValueMetric(BaseMetric):
+    def __init__(self, name=None, resetable=True, emph=False):
+        BaseMetric.__init__(self, name, resetable, emph)
+        self.val = []
+    
+    def _get(self):
+        return self.val
+    
+    def _update(self, val):
+        self.val.append(val)
+    
+    def _reset(self):
+        self.val.clear()
+
+
 class MaxMetric(BaseMetric):
     def __init__(self, name=None, resetable=True, emph=False):
         BaseMetric.__init__(self, name, resetable, emph)
